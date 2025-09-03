@@ -159,7 +159,6 @@ ${truncatedText}
         model: google('gemini-2.5-pro'),
         prompt,
         temperature: 0.1,
-        maxTokens: 4000, // Add token limit
       });
     }, 3, 2000); // 3 retries with 2 second base delay
 

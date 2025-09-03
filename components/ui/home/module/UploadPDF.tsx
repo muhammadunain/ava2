@@ -10,9 +10,10 @@ import { Button } from "../../button";
 import PropertyProcessingLoader from "@/components/loading/Loading";
 import { AnalysisResults } from "./AnalysisResult";
 import { OnboardingSteps } from "./OnboardingSteps";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../../dialog";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger, DrawerDescription } from "../../drawer";
 import { SideSelection } from "./SideSelection";
 import { UploadArea } from "./UploadArea";
+import { DialogHeader } from "../../dialog";
 
 const TransactionModalComponent = () => {
   const [selectedSide, setSelectedSide] = useState('Both');
@@ -652,36 +653,172 @@ const TransactionModalComponent = () => {
       summary.extractionOverview.documentComplexity = 'Complex';
     }
 
-    // Generate extraction challenges
+    // Generate extraction challenges with detailed explanations
     if (summary.extractionOverview.extractionRate < 50) {
-      summary.dataAnalysis.extractionChallenges.push('Low extraction success rate - document may have non-standard formatting');
+      summary.dataAnalysis.extractionChallenges.push('Low extraction success rate indicates document may have non-standard formatting, poor scan quality, or complex layout structure');
     }
     if (summary.dataAnalysis.failedToExtract.length > 3) {
-      summary.dataAnalysis.extractionChallenges.push('Multiple data types not found - document may be incomplete or use different terminology');
+      summary.dataAnalysis.extractionChallenges.push('Multiple data types not found - document may be incomplete, use different terminology, or have information in non-standard formats');
     }
     if (pageCount > 10) {
-      summary.dataAnalysis.extractionChallenges.push('Large document size may have caused some information to be truncated');
+      summary.dataAnalysis.extractionChallenges.push('Large document size may have caused some information to be truncated due to processing limits');
+    }
+    if (summary.dataAnalysis.successfullyExtracted.length === 0) {
+      summary.dataAnalysis.extractionChallenges.push('No structured data found - document may be primarily text-based without clear data patterns');
     }
 
-    // Generate recommendations
+    // Enhanced recommendations with pros/cons analysis
+    const prosAndCons = {
+      pros: [] as string[],
+      cons: [] as string[],
+      dataQualityInsights: [] as string[],
+      extractionReasons: [] as string[]
+    };
+
+    // Analyze what worked well (PROS)
     if (summary.extractionOverview.extractionRate >= 80) {
-      summary.recommendations.push('Excellent extraction rate - document is well-structured and AI-friendly');
+      prosAndCons.pros.push('✅ Excellent extraction rate - document is well-structured and AI-friendly');
+      prosAndCons.pros.push('✅ High-quality document formatting allows for accurate data parsing');
+      prosAndCons.pros.push('✅ Clear data patterns and consistent formatting throughout the document');
     } else if (summary.extractionOverview.extractionRate >= 60) {
-      summary.recommendations.push('Good extraction rate - some manual review recommended for missing data');
+      prosAndCons.pros.push('✅ Good extraction rate with most critical data successfully identified');
+      prosAndCons.pros.push('✅ Document structure is generally compatible with AI processing');
     } else {
-      summary.recommendations.push('Low extraction rate - manual document review strongly recommended');
+      prosAndCons.pros.push('✅ Basic document structure recognized despite formatting challenges');
+    }
+
+    if (result.tables && result.tables.length > 0) {
+      prosAndCons.pros.push('✅ Successfully identified and parsed structured table data');
+      prosAndCons.dataQualityInsights.push(`Found ${result.tables.length} structured table(s) with clear row/column organization`);
+    }
+
+    if (result.timeline && result.timeline.length > 0) {
+      prosAndCons.pros.push('✅ Timeline events successfully extracted with date associations');
+      prosAndCons.dataQualityInsights.push(`Identified ${result.timeline.length} timeline milestone(s) with temporal relationships`);
+    }
+
+    if (result.deadlines && result.deadlines.length > 0) {
+      prosAndCons.pros.push('✅ Critical deadlines identified with urgency levels');
+      prosAndCons.dataQualityInsights.push(`Found ${result.deadlines.length} time-sensitive deadline(s) requiring attention`);
+    }
+
+    // Analyze what didn't work (CONS) with specific reasons
+    if (summary.extractionOverview.extractionRate < 60) {
+      prosAndCons.cons.push('❌ Low extraction success rate may indicate document formatting issues');
+      prosAndCons.extractionReasons.push('Document may use non-standard layouts, poor scan quality, or complex formatting that challenges AI parsing');
+    }
+
+    if (!result.tables || result.tables.length === 0) {
+      prosAndCons.cons.push('❌ No structured tables found - property details may be in paragraph format');
+      prosAndCons.extractionReasons.push('Property information appears to be in unstructured text rather than organized tables, making precise extraction difficult');
+    }
+
+    if (!result.timeline || result.timeline.length === 0) {
+      prosAndCons.cons.push('❌ Timeline information not clearly structured or identifiable');
+      prosAndCons.extractionReasons.push('Dates and milestones may be embedded within paragraphs or use non-standard date formats that are harder to parse');
+    }
+
+    if (!result.deadlines || result.deadlines.length === 0) {
+      prosAndCons.cons.push('❌ Critical deadlines not explicitly stated or formatted');
+      prosAndCons.extractionReasons.push('Important dates may be implied rather than explicitly stated, or use language that doesn\'t clearly indicate urgency');
+    }
+
+    if (!result.tasks || result.tasks.length === 0) {
+      prosAndCons.cons.push('❌ Action items not clearly defined or actionable');
+      prosAndCons.extractionReasons.push('Tasks may be embedded within other sections or described in passive language rather than clear action items');
+    }
+
+    if (!result.financingHistory || result.financingHistory.length === 0) {
+      prosAndCons.cons.push('❌ Financial information not structured or accessible');
+      prosAndCons.extractionReasons.push('Financial details may be in narrative form, use complex terminology, or be distributed across multiple sections');
+    }
+
+    // Data quality insights
+    if (summary.extractionOverview.documentComplexity === 'Complex') {
+      prosAndCons.dataQualityInsights.push('Document complexity is high - contains multiple data types and formatting styles');
+    } else if (summary.extractionOverview.documentComplexity === 'Simple') {
+      prosAndCons.dataQualityInsights.push('Document has simple, consistent structure that facilitates accurate extraction');
+    }
+
+    // Why certain data couldn't be extracted - detailed explanations
+    const extractionLimitations = [] as string[];
+    
+    if (summary.dataAnalysis.failedToExtract.length > 0) {
+      extractionLimitations.push('🔍 **Common Extraction Challenges:**');
+      
+      summary.dataAnalysis.failedToExtract.forEach(item => {
+        switch (item.type) {
+          case 'Property Details':
+            extractionLimitations.push('• Property information may be in narrative paragraphs rather than structured tables');
+            extractionLimitations.push('• Address, price, or property features might use non-standard formatting');
+            break;
+          case 'Timeline Events':
+            extractionLimitations.push('• Dates may be written in various formats (e.g., "end of month" vs "March 31st")');
+            extractionLimitations.push('• Timeline events might be implied rather than explicitly stated');
+            break;
+          case 'Critical Deadlines':
+            extractionLimitations.push('• Deadlines may be conditional ("within 10 days of...") rather than specific dates');
+            extractionLimitations.push('• Important dates might be buried in legal language or footnotes');
+            break;
+          case 'Financial Information':
+            extractionLimitations.push('• Financial data may be in complex legal language or accounting formats');
+            extractionLimitations.push('• Amounts might be referenced indirectly or calculated based on other values');
+            break;
+          case 'Terms & Conditions':
+            extractionLimitations.push('• Legal terms may be in dense paragraph format without clear structure');
+            extractionLimitations.push('• Important clauses might be embedded within larger sections');
+            break;
+        }
+      });
+    }
+
+    // Generate comprehensive recommendations
+    summary.recommendations = [
+      ...prosAndCons.pros,
+      ...prosAndCons.cons,
+      '',
+      '📊 **Data Quality Assessment:**',
+      ...prosAndCons.dataQualityInsights,
+      '',
+      '🔍 **Extraction Analysis:**',
+      ...prosAndCons.extractionReasons,
+      '',
+      '⚠️ **Extraction Limitations:**',
+      ...extractionLimitations,
+      '',
+      '💡 **Actionable Recommendations:**'
+    ];
+
+    // Add specific actionable recommendations
+    if (summary.extractionOverview.extractionRate >= 80) {
+      summary.recommendations.push('• Document is well-structured - extracted data is highly reliable');
+      summary.recommendations.push('• Minimal manual review required - focus on verifying critical dates and amounts');
+    } else if (summary.extractionOverview.extractionRate >= 60) {
+      summary.recommendations.push('• Good data quality overall - review failed extractions for missing critical information');
+      summary.recommendations.push('• Cross-reference extracted dates and deadlines with original document');
+    } else {
+      summary.recommendations.push('• Comprehensive manual review strongly recommended due to low extraction rate');
+      summary.recommendations.push('• Consider providing a higher-quality scan or different document format if available');
     }
 
     if (summary.dataAnalysis.failedToExtract.length > 0) {
-      summary.recommendations.push(`Review ${summary.dataAnalysis.failedToExtract.length} failed extraction(s) for critical missing information`);
+      summary.recommendations.push(`• Manually review ${summary.dataAnalysis.failedToExtract.length} failed extraction categories for critical missing information`);
+      summary.recommendations.push('• Look for information that may be in non-standard formats or embedded within paragraphs');
     }
 
     if (summary.extractionInsights.missingCriticalInfo.length > 0) {
-      summary.recommendations.push('Consider supplementing with additional document sources for missing critical information');
+      summary.recommendations.push('• Consider supplementing with additional document sources for missing critical information');
+      summary.recommendations.push('• Verify that all necessary documents have been provided for complete analysis');
     }
 
-    // Convert Set to Array
-    summary.methodologyBreakdown.dataSourcePages = Array.from(summary.methodologyBreakdown.dataSourcePages);
+    // Add document-specific insights
+    if (pageCount > 5) {
+      summary.recommendations.push('• Large document detected - some information may be in sections not fully processed');
+      summary.recommendations.push('• Consider breaking down into smaller sections for more detailed analysis if needed');
+    }
+
+    // Convert Set to Array for easier handling in UI
+    const dataSourcePagesArray = Array.from(summary.methodologyBreakdown.dataSourcePages);
 
     // Set confidence scores
     summary.methodologyBreakdown.confidenceScores = {
@@ -748,16 +885,16 @@ const TransactionModalComponent = () => {
                     Back to Upload
                   </Button>
                   <div className="flex gap-3">
-                    <Dialog open={showSummaryDialog} onOpenChange={setShowSummaryDialog}>
-                      <DialogTrigger asChild>
+                    <Drawer open={showSummaryDialog} onOpenChange={setShowSummaryDialog}>
+                      <DrawerTrigger asChild>
                         <Button variant="outline" className="cursor-pointer">
                           <FileText className="w-4 h-4 mr-2" />
                           View Summary
                         </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-[95vw] w-full max-h-[95vh] overflow-hidden p-0 bg-gradient-to-br from-slate-50 to-gray-100">
-                        <DialogHeader className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-6 border-b border-blue-200">
-                          <DialogTitle className="text-2xl font-bold flex items-center gap-3">
+                      </DrawerTrigger>
+                      <DrawerContent className="h-full bg-gradient-to-br from-slate-50 to-gray-100">
+                        <DrawerHeader className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-6 border-b border-blue-200">
+                          <DrawerTitle className="text-2xl font-bold flex items-center gap-3">
                             <div className="p-2 bg-white/20 rounded-lg">
                               <FileText className="w-6 h-6" />
                             </div>
@@ -765,18 +902,25 @@ const TransactionModalComponent = () => {
                             <div className="ml-auto text-sm bg-white/20 px-3 py-1 rounded-full">
                               Professional Analysis
                             </div>
-                          </DialogTitle>
-                          <p className="text-blue-100 mt-2">
+                          </DrawerTitle>
+                          <DrawerDescription className="text-blue-100 mt-2">
                             Comprehensive AI-powered document analysis with detailed extraction insights
-                          </p>
-                        </DialogHeader>
-                        <div className="mt-4">
+                          </DrawerDescription>
+                        </DrawerHeader>
+                        <div className="flex-1 overflow-y-auto p-6 bg-white/50 backdrop-blur-sm">
                           {(() => {
                             const summary = generateExtractionSummary(result);
-                            if (!summary) return <div>No analysis available</div>;
+                            if (!summary) return (
+                              <div className="flex items-center justify-center h-64">
+                                <div className="text-center">
+                                  <AlertTriangle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                                  <p className="text-gray-600">No analysis data available</p>
+                                </div>
+                              </div>
+                            );
                             
                             return (
-                              <div className="space-y-6">
+                              <div className="space-y-8 max-w-7xl mx-auto">
                                 {/* Extraction Overview */}
                                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 border border-blue-200">
                                   <h3 className="text-lg font-semibold text-blue-900 mb-4 flex items-center">
@@ -982,17 +1126,86 @@ const TransactionModalComponent = () => {
                                   </div>
                                 )}
 
-                                {/* AI Recommendations */}
-                                <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                                  <h3 className="text-lg font-semibold text-blue-900 mb-3">AI Recommendations</h3>
-                                  <ul className="space-y-2">
-                                    {summary.recommendations.map((rec: string, idx: number) => (
-                                      <li key={idx} className="text-sm text-blue-800 flex items-start">
-                                        <CheckCircle className="w-4 h-4 mr-2 mt-0.5 text-blue-600" />
-                                        {rec}
-                                      </li>
-                                    ))}
-                                  </ul>
+                                {/* AI Recommendations with Enhanced Formatting */}
+                                <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
+                                  <h3 className="text-lg font-semibold text-blue-900 mb-4 flex items-center">
+                                    <CheckCircle className="w-5 h-5 mr-2" />
+                                    Comprehensive Analysis & Recommendations
+                                  </h3>
+                                  <div className="space-y-4">
+                                    {summary.recommendations.map((rec: string, idx: number) => {
+                                      // Handle section headers
+                                      if (rec.startsWith('📊') || rec.startsWith('🔍') || rec.startsWith('⚠️') || rec.startsWith('💡')) {
+                                        return (
+                                          <div key={idx} className="mt-6 mb-3">
+                                            <h4 className="font-semibold text-blue-900 text-base border-b border-blue-200 pb-2">
+                                              {rec}
+                                            </h4>
+                                          </div>
+                                        );
+                                      }
+                                      
+                                      // Handle empty lines for spacing
+                                      if (rec.trim() === '') {
+                                        return <div key={idx} className="h-2"></div>;
+                                      }
+                                      
+                                      // Handle pros (✅)
+                                      if (rec.startsWith('✅')) {
+                                        return (
+                                          <div key={idx} className="bg-green-50 border border-green-200 rounded-lg p-3">
+                                            <div className="text-sm text-green-800 flex items-start">
+                                              <span className="text-green-600 mr-2 mt-0.5">✅</span>
+                                              <span className="font-medium">{rec.substring(2).trim()}</span>
+                                            </div>
+                                          </div>
+                                        );
+                                      }
+                                      
+                                      // Handle cons (❌)
+                                      if (rec.startsWith('❌')) {
+                                        return (
+                                          <div key={idx} className="bg-red-50 border border-red-200 rounded-lg p-3">
+                                            <div className="text-sm text-red-800 flex items-start">
+                                              <span className="text-red-600 mr-2 mt-0.5">❌</span>
+                                              <span className="font-medium">{rec.substring(2).trim()}</span>
+                                            </div>
+                                          </div>
+                                        );
+                                      }
+                                      
+                                      // Handle bullet points
+                                      if (rec.startsWith('•')) {
+                                        return (
+                                          <div key={idx} className="bg-white border border-blue-100 rounded-lg p-3">
+                                            <div className="text-sm text-blue-800 flex items-start">
+                                              <span className="text-blue-600 mr-2 mt-0.5">•</span>
+                                              <span>{rec.substring(1).trim()}</span>
+                                            </div>
+                                          </div>
+                                        );
+                                      }
+                                      
+                                      // Handle special markers
+                                      if (rec.includes('**') && rec.includes(':**')) {
+                                        return (
+                                          <div key={idx} className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                                            <div className="text-sm text-yellow-800 font-medium">
+                                              {rec.replace(/\*\*/g, '')}
+                                            </div>
+                                          </div>
+                                        );
+                                      }
+                                      
+                                      // Default formatting
+                                      return (
+                                        <div key={idx} className="text-sm text-blue-800 flex items-start">
+                                          <CheckCircle className="w-4 h-4 mr-2 mt-0.5 text-blue-600 flex-shrink-0" />
+                                          <span>{rec}</span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
                                 </div>
 
                                 {/* Data Sources */}
@@ -1002,8 +1215,8 @@ const TransactionModalComponent = () => {
                                     <div>
                                       <h4 className="font-medium text-gray-800 mb-2">Pages Analyzed:</h4>
                                       <p className="text-sm text-gray-600">
-                                        {summary.methodologyBreakdown.dataSourcePages.length > 0 
-                                          ? summary.methodologyBreakdown.dataSourcePages.join(', ')
+                                        {Array.from(summary.methodologyBreakdown.dataSourcePages).length > 0 
+                                          ? Array.from(summary.methodologyBreakdown.dataSourcePages).join(', ')
                                           : 'All pages processed'}
                                       </p>
                                     </div>
@@ -1029,8 +1242,8 @@ const TransactionModalComponent = () => {
                             );
                           })()}
                         </div>
-                      </DialogContent>
-                    </Dialog>
+                      </DrawerContent>
+                    </Drawer>
                     <Button onClick={() => setCurrentStep(2)} className="cursor-pointer">
                       Let's Review
                     </Button>
