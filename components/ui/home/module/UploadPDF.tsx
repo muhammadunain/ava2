@@ -887,10 +887,10 @@ const TransactionModalComponent = () => {
                   <div className="flex gap-3">
                     <Drawer open={showSummaryDialog} onOpenChange={setShowSummaryDialog}>
                       <DrawerTrigger asChild>
-                        {/* <Button variant="outline" className="cursor-pointer">
+                        <Button variant="outline" className="cursor-pointer">
                           <FileText className="w-4 h-4 mr-2" />
                           View Summary
-                        </Button> */}
+                        </Button>
                       </DrawerTrigger>
                       <DrawerContent className="h-full bg-gradient-to-br from-slate-50 to-gray-100">
                         <DrawerHeader className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-6 border-b border-blue-200">
